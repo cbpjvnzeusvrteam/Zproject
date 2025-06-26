@@ -7,7 +7,7 @@ const http = require("http");
 const port = process.env.PORT || 3000;
 
 http.createServer((req, res) => {
-    res.end("🌸 Bot is running and alive!");
+    res.end("🌸 Sever Bot Zproject X Duong Cong Bang Đang Hoạt Động, Duong Cong Bang Dep Zai Hog:)    °○° ヽ(=ﾟωﾟ)人(ﾟωﾟ=)ﾉ | Bạn Không Đủ Trình Ddod Sever Zproject X Duong Cong Bang ヽ(●´ε｀●)ノ");
 }).listen(port, () => {
     log(`🌐 Đã mở cổng HTTP trên port ${port}`, "[ SERVER ]");
 });
