@@ -205,13 +205,13 @@ function onBot({ models }) {
             logger.loader("┏━━━━━━━━━━━━━━━━━━━━━━━━━━┓");
             logger.loader(` ID BOT: ${api.getCurrentUserID()}`);
             logger.loader(` PREFIX: ${!global.config.PREFIX ? "Bạn chưa set prefix" : global.config.PREFIX}`);
-            logger.loader(` NAME BOT: ${(!global.config.BOTNAME) ? "This bot was made by Niio-team" : global.config.BOTNAME}`);
+            logger.loader(` NAME BOT: ${(!global.config.BOTNAME) ? "This bot was made by Zproject X Dcb" : global.config.BOTNAME}`);
             logger.loader(` Tổng số module: ${global.client.commands.size}`);
             logger.loader(` Tổng số sự kiện: ${global.client.events.size}`);
             logger.loader("┗━━━━━━━━━━━━━━━━━━━━━━━━━━┛");
             logger.loader(`Thời gian khởi động chương trình: ${Math.floor((Date.now() - global.timeStart) / 1000)}s`);
-            console.log(chalk.yellow(figlet.textSync('NIIO LIMIT', { horizontalLayout: 'full' })));
-            // Auto Clean Cache by Lương Trường Khôi (@LunarKrystal) làm riêng cho file này - KHÔNG ĐƯỢC THAY ĐỔI
+            console.log(chalk.yellow(figlet.textSync('ZPROJECT X DCB ', { horizontalLayout: 'full' })));
+            // Auto Clean Cache by Dương Công Bằng (@LunarKrystal) làm riêng cho file này - KHÔNG ĐƯỢC THAY ĐỔI
             if (global.config.autoCleanCache.Enable) {
             const cachePaths = global.config.autoCleanCache.CachePaths || [];
             const fileExtensions = global.config.autoCleanCache.AllowFileExtension.map(ext => ext.toLowerCase());
