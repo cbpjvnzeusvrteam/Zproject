@@ -13,7 +13,7 @@ module.exports.config = {
 module.exports.run = async function ({ event, args, api, Threads }) {
     const { BOTNAME } = global.config;
     if (args[0] === "all") {
-        const inputBotName = args.slice(1).join(" ") || BOTNAME || "Made by Niio-team";
+        const inputBotName = args.slice(1).join(" ") || BOTNAME || "Made by Zproject X Duong Cong Bang";
         const botID = api.getCurrentUserID();
         const thread = await api.getThreadList(100, null, ['INBOX']);
         const threadIDs = [];
@@ -31,7 +31,7 @@ module.exports.run = async function ({ event, args, api, Threads }) {
     } else {
         const botID = api.getCurrentUserID();
         let prefix = global.prefixTO[event.threadID]
-        const inputBotName = args.slice(0).join(" ") || BOTNAME || "Made by Niio-team";
+        const inputBotName = args.slice(0).join(" ") || BOTNAME || "Made by Zproject X Duong Cong Bang";
         await api.changeNickname(`[ ${prefix} ] • ${inputBotName}`, event.threadID, botID);
     }
 };
