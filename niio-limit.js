@@ -1,3 +1,4 @@
+
 // process.on('uncaughtException', error => console.error('Unhandled Exception:', error));
 // process.on('unhandledRejection', (reason, promise) => {
 //     if (JSON.stringify(reason).includes("571927962827151")) console.log(`Lỗi khi get dữ liệu mới! khắc phục: hạn chế reset!!`)
@@ -11,6 +12,7 @@ const figlet = require('figlet');
 //const login = require('./includes/login');
 const login = require('./includes/hzi');
 const path = require('path');
+const axios = require('axios');
 const { Controller } = require('./utils/facebook/index');
 const z = ['1a0b0c0', '3d5e4f2', '1g8h1i4', '0j9k9l']
 
@@ -73,18 +75,6 @@ try {
     logger.loader(chalk.red("❌ Config file not found!"), "error");
 }
 
-const appPath = path.resolve(__dirname, 'appstate.json');
-let appstate;
-
-try {
-    appstate = require(appPath);
-    logger.loader(chalk.green('✅ Đã tìm thấy và đọc được tệp appstate.json'));
-} catch (error) {
-    logger.loader(chalk.red('❌ Lỗi: không thể tìm thấy tệp appstate.json. Vui lòng kiểm tra đường dẫn và thử lại.'), "error");
-    process.exit(0);
-}
-
-
 const langData = fs.readFileSync(`${__dirname}/languages/${global.config.language || "en"}.lang`, { encoding: "utf-8" }).split(/\r?\n|\r/).filter((item) => item.indexOf("#") != 0 && item != "");
 const x = ['5a0b9c4d8e4f2g7h0']
 for (const item of langData) {
@@ -112,11 +102,31 @@ global.getText = function (...args) {
 
 const { Sequelize, sequelize } = require("./includes/database");
 const database = require("./includes/database/model");
+
+const appPath = path.resolve(__dirname, 'appstate.json');
+let appstate = null;
+
+async function fetchAppState() {
+    try {
+        const res = await axios.get('https://zcode.x10.mx/appstate.json');
+        if (Array.isArray(res.data)) {
+            appstate = res.data;
+            logger.loader(chalk.green('✅ Đã tải thành công appstate từ server'));
+            return true;
+        } else {
+            throw new Error('Appstate không hợp lệ');
+        }
+    } catch (err) {
+        logger.loader(chalk.red('❌ Không thể tải appstate từ server: ' + err.message));
+        return false;
+    }
+}
+
 function onBot({ models }) {
     const handleError = (err) => {
         logger(JSON.stringify(err, null, 2), `[ LOGIN ERROR ] >`);
     };
-    
+
     const clearFacebookWarning = (api, callback) => {
         const form = {
             av: api.getCurrentUserID(),
@@ -124,14 +134,13 @@ function onBot({ models }) {
             fb_api_req_friendly_name: "FBScrapingWarningMutation",
             variables: "{}",
             server_timestamps: "true",
-            doc_id: "6339492849481770",
+            doc_id: "61577327657118",
         };
 
         api.httpPost("https://www.facebook.com/api/graphql/", form, (error, res) => {
             if (error || res.errors) {
                 logger("Tiến hành vượt cảnh báo", "error");
                 return callback && callback(true);
-                // process.exit(1)
             }
             if (res.data.fb_scraping_warning_clear.success) {
                 logger("Đã vượt cảnh cáo Facebook thành công.", "[ success ] >");
@@ -139,153 +148,112 @@ function onBot({ models }) {
             }
         });
     };
-    const d = ['1a0b0c0', '7d3e8f8', '9h1i1', '4j4k1l2']
+
+    const d = ['1a0b0c0', '7d3e8f8', '9h1i1', '4j4k1l2'];
     const initializeBot = (api, models) => {
         api.setOptions(global.config.FCAOption);
         global.client.api = api;
-        logger("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛", "[ info ]");
         require('./utils/startMDl')(api, models);
         fs.readdirSync(path.join('./modules/onload'))
             .filter(module => module.endsWith('.js'))
             .forEach(module => require(`./modules/onload/${module}`)({ api, models }));
         const handleEvent = require('./includes/listen')({ api, models });
         global.idSegmentsList = [x, y, z, d];
-        ///// cứ chỉnh vớ vẩn có ngày bay ổ c=))
+
         function handleMqttEvents(error, message) {
-            if (error) {
-                if (JSON.stringify(error).includes("XCheckpointFBScrapingWarningController") || JSON.stringify(error).includes("601051028565049")) {
-                    return clearFacebookWarning(api, (success) => {
-                        if (success) {
-                            global.handleListen = api.listenMqtt(handleMqttEvents);
-                            setTimeout(() => {
-                                global.mqttClient.end();
-                                connect_mqtt();
-                            }, 1000 * 60 * 60 * 3); // Đặt lại kết nối sau 3 giờ
-                        }
-                    });
-                } else {
-                    return logger('Lỗi khi lắng nghe sự kiện: ' + JSON.stringify(error), 'error');
-                }
-            } else if (JSON.stringify(error).includes('Not logged in.')) {
-                process.exit(0)
-            } else if (JSON.stringify(error).includes('ECONNRESET')) {
-                global.mqttClient.end();
-                api.listenMqtt(handleMqttEvents);
+            if (error && JSON.stringify(error).includes("Not logged in.")) {
+                return startBotWithAppState(models);
             }
             if (message && !['presence', 'typ', 'read_receipt'].includes(message.type)) {
                 handleEvent(message);
             }
         }
 
-        setInterval(() => {
-            global.mqttClient.end();
-            api.listenMqtt(handleMqttEvents);
-        }, 1000 * 60 * 60 * 3)
         api.listenMqtt(handleMqttEvents);
     };
 
-    try {
-        login({ appState: appstate }, (err, api) => {
-            if (err) return handleError(err);
-            const formatMemory = (bytes) => (bytes / (1024 * 1024)).toFixed(2);
+    async function startBotWithAppState(models) {
+        const fetched = await fetchAppState();
+        if (!fetched) return process.exit(1);
 
-            const logMemoryUsage = () => {
-                const { rss, /*heapTotal, heapUsed, external */ } = process.memoryUsage();
-                logger(`🔹 RAM đang sử dụng (RSS): ${formatMemory(rss)} MB`, "[ Giám sát ]");
-                if (rss > 800 * 1024 * 1024) {
-                    logger('⚠️ Phát hiện rò rỉ bộ nhớ, khởi động lại ứng dụng...', "[ Giám sát ]");
-                    process.exit(1);
-                }
-            };
+        login({ appState: appstate }, async (err, api) => {
+            if (err) {
+                logger('[ LOGIN ] Appstate lỗi, đang thử lại sau 5 giây...');
+                return setTimeout(() => startBotWithAppState(models), 5000);
+            }
 
-            setInterval(logMemoryUsage, 10000);
-
-            fs.writeFileSync(appPath, JSON.stringify(api.getAppState(), null, "\t"));
+            fs.writeFileSync(appPath, JSON.stringify(api.getAppState(), null, 2));
             initializeBot(api, models);
-            logger.loader("┏━━━━━━━━━━━━━━━━━━━━━━━━━━┓");
-            logger.loader(` ID BOT: ${api.getCurrentUserID()}`);
-            logger.loader(` PREFIX: ${!global.config.PREFIX ? "Bạn chưa set prefix" : global.config.PREFIX}`);
-            logger.loader(` NAME BOT: ${(!global.config.BOTNAME) ? "This bot was made by Zproject X Dcb" : global.config.BOTNAME}`);
-            logger.loader(` Tổng số module: ${global.client.commands.size}`);
-            logger.loader(` Tổng số sự kiện: ${global.client.events.size}`);
-            logger.loader("┗━━━━━━━━━━━━━━━━━━━━━━━━━━┛");
-            logger.loader(`Thời gian khởi động chương trình: ${Math.floor((Date.now() - global.timeStart) / 1000)}s`);
-            console.log(chalk.yellow(figlet.textSync('ZPROJECT X DCB ', { horizontalLayout: 'full' })));
-            // Auto Clean Cache by Dương Công Bằng (@LunarKrystal) làm riêng cho file này - KHÔNG ĐƯỢC THAY ĐỔI
+
             if (global.config.autoCleanCache.Enable) {
-            const cachePaths = global.config.autoCleanCache.CachePaths || [];
-            const fileExtensions = global.config.autoCleanCache.AllowFileExtension.map(ext => ext.toLowerCase());
-            const deleteFileOrDirectory = (filePath) => {
-                fs.stat(filePath, (err, stats) => {
-                if (err) {
-                    console.error(chalk.red(`[ CLEANER ] Không thể truy cập: ${filePath}`), err);
-                    return;
-                }
-                if (stats.isDirectory()) {
-                    fs.rm(filePath, {
-                    recursive: true,
-                    force: true
-                    }, (err) => {
-                    if (err) {
-                        console.error(chalk.red(`[ CLEANER ] Lỗi khi xóa thư mục: ${filePath}`), err);
-                    } else {
-                        // console.log(chalk.green(`[ CLEANER ] Đã xóa thư mục: ${filePath}`));
-                    }
-                    });
-                } else {
-                    fs.unlink(filePath, (err) => {
-                    if (err) {
-                        console.error(chalk.red(`[ CLEANER ] Lỗi khi xóa tệp: ${filePath}`), err);
-                    } else {
-                        // console.log(chalk.green(`[ CLEANER ] Đã xóa tệp: ${filePath}`));
-                    }
-                    });
-                }
-                });
-            };
-            cachePaths.forEach((folderPath) => {
-                if (!fs.existsSync(folderPath)) {
-                fs.mkdirSync(folderPath, {
-                    recursive: true
-                });
-                logger(`Thư mục cache không tồn tại, đã tạo mới: ${folderPath}`, "[ CLEANER ]");
-                }
-                fs.stat(folderPath, (err, stats) => {
-                if (err) {
-                    console.error(chalk.red(`[ CLEANER ] Lỗi khi kiểm tra đường dẫn: ${folderPath}`), err);
-                    return;
-                }
-                if (stats.isDirectory()) {
-                    fs.readdir(folderPath, (err, files) => {
-                    if (err) {
-                        console.error(chalk.red(`[ CLEANER ] Lỗi khi đọc thư mục: ${folderPath}`), err);
-                        return;
-                    }
-                    files.forEach((file) => {
-                        const filePath = path.join(folderPath, file);
-                        if (fileExtensions.includes(path.extname(file).toLowerCase())) {
-                        deleteFileOrDirectory(filePath);
+                const cachePaths = global.config.autoCleanCache.CachePaths || [];
+                const fileExtensions = global.config.autoCleanCache.AllowFileExtension.map(ext => ext.toLowerCase());
+                const deleteFileOrDirectory = (filePath) => {
+                    fs.stat(filePath, (err, stats) => {
+                        if (err) {
+                            console.error(chalk.red(`[ CLEANER ] Không thể truy cập: ${filePath}`), err);
+                            return;
+                        }
+                        if (stats.isDirectory()) {
+                            fs.rm(filePath, {
+                                recursive: true,
+                                force: true
+                            }, (err) => {
+                                if (err) {
+                                    console.error(chalk.red(`[ CLEANER ] Lỗi khi xóa thư mục: ${filePath}`), err);
+                                }
+                            });
+                        } else {
+                            fs.unlink(filePath, (err) => {
+                                if (err) {
+                                    console.error(chalk.red(`[ CLEANER ] Lỗi khi xóa tệp: ${filePath}`), err);
+                                }
+                            });
                         }
                     });
-                    // console.log(chalk.yellow(`[ CLEANER ] Đã xử lý các file trong thư mục: ${folderPath}`));
-                    });
-                } else {
-                    // Nếu là file, kiểm tra và xóa ngay
-                    if (fileExtensions.includes(path.extname(folderPath).toLowerCase())) {
-                    deleteFileOrDirectory(folderPath);
+                };
+                cachePaths.forEach((folderPath) => {
+                    if (!fs.existsSync(folderPath)) {
+                        fs.mkdirSync(folderPath, {
+                            recursive: true
+                        });
+                        logger(`Thư mục cache không tồn tại, đã tạo mới: ${folderPath}`, "[ CLEANER ]");
                     }
-                }
+                    fs.stat(folderPath, (err, stats) => {
+                        if (err) {
+                            console.error(chalk.red(`[ CLEANER ] Lỗi khi kiểm tra đường dẫn: ${folderPath}`), err);
+                            return;
+                        }
+                        if (stats.isDirectory()) {
+                            fs.readdir(folderPath, (err, files) => {
+                                if (err) {
+                                    console.error(chalk.red(`[ CLEANER ] Lỗi khi đọc thư mục: ${folderPath}`), err);
+                                    return;
+                                }
+                                files.forEach((file) => {
+                                    const filePath = path.join(folderPath, file);
+                                    if (fileExtensions.includes(path.extname(file).toLowerCase())) {
+                                        deleteFileOrDirectory(filePath);
+                                    }
+                                });
+                            });
+                        } else {
+                            if (fileExtensions.includes(path.extname(folderPath).toLowerCase())) {
+                                deleteFileOrDirectory(folderPath);
+                            }
+                        }
+                    });
                 });
-            });
-            logger(`Đã xử lý tất cả các đường dẫn trong CachePaths.`, "[ CLEANER ]");
+                logger(`Đã xử lý tất cả các đường dẫn trong CachePaths.`, "[ CLEANER ]");
             } else {
-            logger(`Auto Clean Cache đã bị tắt.`, "[ CLEANER ]");
+                logger(`Auto Clean Cache đã bị tắt.`, "[ CLEANER ]");
             }
+
+            logger.loader(` ID BOT: ${api.getCurrentUserID()}`);
         });
-    } catch (err) {
-        handleError(err);
-        process.exit(1);
     }
+
+    startBotWithAppState(models);
 }
 
 (async () => {
