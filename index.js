@@ -8,7 +8,7 @@ const port = process.env.PORT || 3000;
 
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-  res.end(\`
+  res.end(`
     <!DOCTYPE html>
     <html lang="vi">
     <head>
@@ -78,7 +78,7 @@ http.createServer((req, res) => {
       </div>
     </body>
     </html>
-  \`);
+  `);
 }).listen(port, () => {
   log(`🌐 Giao diện HTTP đã chạy tại cổng ${port}`, "[ SERVER ]");
 });
